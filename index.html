@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Room Bloom Arena</title>
+  <style>
+    :root {
+      --bg: #070912;
+      --panel: rgba(9, 13, 27, 0.78);
+      --panel-strong: rgba(14, 20, 40, 0.92);
+      --line: rgba(255,255,255,0.16);
+      --text: #eef5ff;
+      --muted: #9caad0;
+      --hot: #8dfcff;
+      --pink: #ff6bd5;
+      --good: #9dffbf;
+      --bad: #ff8585;
+      --warn: #ffe08a;
+      --shadow: rgba(0,0,0,0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(107, 86, 255, 0.22), transparent 34%),
+        radial-gradient(circle at 78% 24%, rgba(0, 236, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 50% 100%, rgba(255, 83, 196, 0.12), transparent 38%),
+        var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
+    }
+
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    .hud {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      width: min(410px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 22px 70px var(--shadow);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      user-select: none;
+      z-index: 5;
+    }
+
+    .topline {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+      letter-spacing: 0.2px;
+    }
+
+    .badge {
+      border: 1px solid rgba(141,252,255,0.42);
+      color: var(--hot);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-weight: 800;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(141,252,255,0.08);
+      white-space: nowrap;
+    }
+
+    .intro {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .meters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .meter {
+      min-height: 54px;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(0,0,0,0.24);
+    }
+    .meter small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+    .meter strong {
+      display: block;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-strong);
+      color: var(--text);
+      padding: 10px 9px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(141,252,255,0.75);
+      background: rgba(25, 34, 66, 0.96);
+    }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .primary {
+      background: linear-gradient(180deg, rgba(84, 89, 255, 0.95), rgba(81, 26, 164, 0.95));
+      border-color: rgba(193, 173, 255, 0.48);
+    }
+    .hot {
+      background: linear-gradient(180deg, rgba(0, 213, 255, 0.35), rgba(27, 83, 139, 0.88));
+      border-color: rgba(141,252,255,0.55);
+    }
+    .danger {
+      background: linear-gradient(180deg, rgba(153, 42, 76, 0.95), rgba(85, 24, 45, 0.95));
+      border-color: rgba(255, 133, 133, 0.45);
+    }
+    .wide { grid-column: span 2; }
+    .full { grid-column: 1 / -1; }
+
+    label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-top: 11px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--hot);
+    }
+
+    .status {
+      margin-top: 11px;
+      min-height: 68px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(0,0,0,0.24);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .status strong { color: var(--text); }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    .xrbar {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      z-index: 6;
+      pointer-events: none;
+    }
+    .xrbar > * { pointer-events: auto; }
+
+    .help {
+      max-width: min(420px, calc(100vw - 32px));
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      color: var(--muted);
+      background: var(--panel);
+      box-shadow: 0 18px 60px var(--shadow);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      min-width: 1.3em;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      .hud { left: 10px; top: 10px; width: calc(100vw - 20px); padding: 12px; }
+      .help { display: none; }
+      .xrbar { right: 10px; bottom: 10px; }
+      .meters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .buttons { grid-template-columns: repeat(2, 1fr); }
+      .wide { grid-column: span 1; }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <aside class="hud" id="hud" aria-label="Room Bloom Arena controls">
+    <div class="topline">
+      <h1>Room Bloom Arena</h1>
+      <div class="badge" id="modeBadge">Garden</div>
+    </div>
+    <p class="intro">
+      Open on Quest Browser and enter AR. Trigger plants or shoots; grip changes mode. The app uses floor-space aiming first, and detected room planes when the browser exposes them.
+    </p>
+
+    <div class="meters">
+      <div class="meter"><small>Score</small><strong id="scoreEl">0</strong></div>
+      <div class="meter"><small>Best</small><strong id="bestEl">0</strong></div>
+      <div class="meter"><small>Blooms</small><strong id="bloomEl">0</strong></div>
+      <div class="meter"><small>Planes</small><strong id="planeEl">0</strong></div>
+    </div>
+
+    <div class="buttons">
+      <button class="primary" id="gardenBtn">Garden</button>
+      <button class="hot" id="swarmBtn">Swarm</button>
+      <button id="hybridBtn">Hybrid</button>
+      <button id="burstBtn">Bloom burst</button>
+      <button id="debugBtn">Planes off</button>
+      <button id="captureBtn">Room scan</button>
+      <button id="saveBtn">Save</button>
+      <button id="loadBtn">Load</button>
+      <button id="muteBtn">Sound on</button>
+      <button class="danger full" id="resetBtn">Reset arena</button>
+    </div>
+
+    <label>
+      <span>Growth energy</span>
+      <span id="energyLabel">70%</span>
+      <input id="energySlider" type="range" min="20" max="120" value="70" />
+    </label>
+
+    <label>
+      <span>Manual floor offset</span>
+      <span id="floorLabel">0 cm</span>
+      <input id="floorSlider" type="range" min="-80" max="80" value="0" />
+    </label>
+
+    <label>
+      <span>Swarm pressure</span>
+      <span id="pressureLabel">Medium</span>
+      <input id="pressureSlider" type="range" min="1" max="5" value="3" />
+    </label>
+
+    <div class="status" id="statusEl"></div>
+  </aside>
+
+  <div class="xrbar" id="xrbar">
+    <div id="xrButtons"></div>
+    <div class="help">
+      Desktop: click to plant/shoot, <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> mode, <kbd>D</kbd> debug planes, <kbd>R</kbd> reset. Quest: trigger acts, grip changes mode. Other controller buttons are ignored.
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    const app = document.getElementById('app');
+    const xrButtons = document.getElementById('xrButtons');
+    const modeBadge = document.getElementById('modeBadge');
+    const statusEl = document.getElementById('statusEl');
+    const scoreEl = document.getElementById('scoreEl');
+    const bestEl = document.getElementById('bestEl');
+    const bloomEl = document.getElementById('bloomEl');
+    const planeEl = document.getElementById('planeEl');
+    const gardenBtn = document.getElementById('gardenBtn');
+    const swarmBtn = document.getElementById('swarmBtn');
+    const hybridBtn = document.getElementById('hybridBtn');
+    const burstBtn = document.getElementById('burstBtn');
+    const debugBtn = document.getElementById('debugBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const loadBtn = document.getElementById('loadBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const energySlider = document.getElementById('energySlider');
+    const floorSlider = document.getElementById('floorSlider');
+    const pressureSlider = document.getElementById('pressureSlider');
+    const energyLabel = document.getElementById('energyLabel');
+    const floorLabel = document.getElementById('floorLabel');
+    const pressureLabel = document.getElementById('pressureLabel');
+
+    const clock = new THREE.Clock();
+    const scene = new THREE.Scene();
+    scene.background = null;
+    scene.fog = new THREE.FogExp2(0x070912, 0.028);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 80);
+    camera.position.set(0, 1.55, 4.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local-floor');
+    renderer.shadowMap.enabled = true;
+    app.appendChild(renderer.domElement);
+
+    const raycaster = new THREE.Raycaster();
+    const tmpMatrix = new THREE.Matrix4();
+    const tmpVecA = new THREE.Vector3();
+    const tmpVecB = new THREE.Vector3();
+    const tmpQuat = new THREE.Quaternion();
+    const tmpScale = new THREE.Vector3();
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const bloomRoot = new THREE.Group();
+    const swarmRoot = new THREE.Group();
+    const planeRoot = new THREE.Group();
+    const particleRoot = new THREE.Group();
+    root.add(bloomRoot, swarmRoot, planeRoot, particleRoot);
+
+    const hemi = new THREE.HemisphereLight(0xf2fbff, 0x223044, 1.2);
+    scene.add(hemi);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+    keyLight.position.set(4, 8, 5);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+    const rimLight = new THREE.DirectionalLight(0x7df5ff, 0.9);
+    rimLight.position.set(-3, 3, -5);
+    scene.add(rimLight);
+
+    const desktopFloor = makeDesktopFloor();
+    root.add(desktopFloor);
+    const reticle = makeReticle();
+    scene.add(reticle);
+
+    const controller0 = renderer.xr.getController(0);
+    const controller1 = renderer.xr.getController(1);
+    const controllers = [controller0, controller1];
+    controllers.forEach((controller, index) => {
+      controller.userData.index = index;
+      controller.add(makeControllerRay(index));
+      controller.addEventListener('selectstart', () => actFromController(controller));
+      controller.addEventListener('squeezestart', () => cycleMode());
+      scene.add(controller);
+    });
+
+    const state = {
+      mode: 'garden',
+      score: 0,
+      best: Number(localStorage.getItem('roomBloomArenaBest') || 0),
+      muted: false,
+      debugPlanes: false,
+      xrActive: false,
+      xrMode: 'desktop',
+      lastStatus: '',
+      floorOffset: 0,
+      energy: 0.70,
+      pressure: 3,
+      spawnTimer: 0,
+      flowers: [],
+      enemies: [],
+      particles: [],
+      planeRecords: new Map(),
+      planeMeshes: [],
+      roomCaptureTried: false,
+      hasPlaneSupport: false,
+      lastPlaneSeenAt: 0,
+      actionCooldown: 0
+    };
+
+    bestEl.textContent = state.best;
+
+    const arButton = ARButton.createButton(renderer, {
+      optionalFeatures: ['local-floor', 'bounded-floor', 'plane-detection', 'anchors', 'hit-test', 'dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+    const vrButton = VRButton.createButton(renderer, {
+      optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+    });
+    styleXRButton(arButton, 'ENTER ROOM AR');
+    styleXRButton(vrButton, 'ENTER VR');
+    xrButtons.appendChild(arButton);
+    xrButtons.appendChild(vrButton);
+
+    renderer.xr.addEventListener('sessionstart', async () => {
+      const session = renderer.xr.getSession();
+      state.xrActive = true;
+      state.xrMode = session.environmentBlendMode === 'opaque' ? 'vr' : 'ar';
+      desktopFloor.visible = state.xrMode !== 'ar';
+      scene.fog.density = state.xrMode === 'ar' ? 0.0 : 0.028;
+      announce(state.xrMode === 'ar'
+        ? 'AR is running. Trigger plants or shoots at the floor/room plane. Grip changes mode.'
+        : 'VR is running. Trigger plants or shoots on the virtual floor. Grip changes mode.');
+      session.addEventListener('end', () => {
+        state.xrActive = false;
+        state.xrMode = 'desktop';
+        desktopFloor.visible = true;
+        scene.fog.density = 0.028;
+        clearPlaneMeshes();
+        announce('XR session ended. Desktop fallback is active.');
+      }, { once: true });
+    });
+
+    gardenBtn.addEventListener('click', () => setMode('garden'));
+    swarmBtn.addEventListener('click', () => setMode('swarm'));
+    hybridBtn.addEventListener('click', () => setMode('hybrid'));
+    burstBtn.addEventListener('click', () => bloomBurst());
+    debugBtn.addEventListener('click', () => togglePlaneDebug());
+    captureBtn.addEventListener('click', () => initiateRoomCapture());
+    saveBtn.addEventListener('click', () => saveGarden());
+    loadBtn.addEventListener('click', () => loadGarden());
+    muteBtn.addEventListener('click', () => toggleSound());
+    resetBtn.addEventListener('click', () => resetArena());
+
+    energySlider.addEventListener('input', () => {
+      state.energy = Number(energySlider.value) / 100;
+      energyLabel.textContent = `${energySlider.value}%`;
+    });
+    floorSlider.addEventListener('input', () => {
+      state.floorOffset = Number(floorSlider.value) / 100;
+      floorLabel.textContent = `${floorSlider.value} cm`;
+      floorPlane.constant = -state.floorOffset;
+      desktopFloor.position.y = state.floorOffset;
+    });
+    pressureSlider.addEventListener('input', () => {
+      state.pressure = Number(pressureSlider.value);
+      pressureLabel.textContent = ['Low', 'Calm', 'Medium', 'Sharp', 'Wild'][state.pressure - 1];
+    });
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+
+    setMode('garden');
+    announce('Ready. On Quest, open this from GitHub Pages and press ENTER ROOM AR. If room planes do not appear, use Room scan or your Quest room setup.');
+
+    renderer.setAnimationLoop(render);
+
+    function makeDesktopFloor() {
+      const group = new THREE.Group();
+      const grid = new THREE.GridHelper(9, 18, 0x4eeeff, 0x23334a);
+      grid.material.transparent = true;
+      grid.material.opacity = 0.22;
+      group.add(grid);
+
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 4.35, 96),
+        new THREE.MeshBasicMaterial({ color: 0x7df5ff, transparent: true, opacity: 0.06, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      group.add(ring);
+      return group;
+    }
+
+    function makeReticle() {
+      const group = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.055, 0.072, 32),
+        new THREE.MeshBasicMaterial({ color: 0x8dfcff, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 16, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff6bd5, transparent: true, opacity: 0.9 })
+      );
+      group.add(ring, dot);
+      group.visible = false;
+      return group;
+    }
+
+    function makeControllerRay(index) {
+      const group = new THREE.Group();
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -3.5)
+      ]);
+      const mat = new THREE.LineBasicMaterial({ color: index === 0 ? 0x8dfcff : 0xff6bd5, transparent: true, opacity: 0.75 });
+      const line = new THREE.Line(geo, mat);
+      line.name = 'trigger-ray';
+      group.add(line);
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.035, 0.12, 16),
+        new THREE.MeshBasicMaterial({ color: index === 0 ? 0x8dfcff : 0xff6bd5, transparent: true, opacity: 0.9 })
+      );
+      tip.position.z = -3.5;
+      tip.rotation.x = -Math.PI / 2;
+      group.add(tip);
+      return group;
+    }
+
+    function render(time, frame) {
+      const dt = Math.min(clock.getDelta(), 0.05);
+      state.actionCooldown = Math.max(0, state.actionCooldown - dt);
+
+      if (frame && state.xrActive) updateDetectedPlanes(frame);
+      updateReticle();
+      updateBlooms(dt, time * 0.001);
+      updateEnemies(dt, time * 0.001);
+      updateParticles(dt);
+      updateHud();
+      renderer.render(scene, camera);
+    }
+
+    function updateDetectedPlanes(frame) {
+      if (!('detectedPlanes' in frame) || !frame.detectedPlanes) return;
+      const refSpace = renderer.xr.getReferenceSpace();
+      if (!refSpace) return;
+      state.hasPlaneSupport = true;
+      state.lastPlaneSeenAt = performance.now();
+
+      const live = new Set();
+      for (const plane of frame.detectedPlanes) {
+        live.add(plane);
+        let record = state.planeRecords.get(plane);
+        if (!record) {
+          record = createPlaneRecord(plane);
+          state.planeRecords.set(plane, record);
+          planeRoot.add(record.mesh);
+          state.planeMeshes.push(record.mesh);
+        }
+
+        if (record.lastChangedTime !== plane.lastChangedTime) {
+          rebuildPlaneGeometry(record, plane);
+          record.lastChangedTime = plane.lastChangedTime;
+        }
+
+        const pose = frame.getPose(plane.planeSpace, refSpace);
+        if (pose) {
+          record.mesh.matrix.fromArray(pose.transform.matrix);
+          record.mesh.matrix.decompose(record.mesh.position, record.mesh.quaternion, record.mesh.scale);
+          record.mesh.updateMatrixWorld(true);
+          record.mesh.visible = state.debugPlanes;
+          record.orientation = plane.orientation || record.orientation || 'unknown';
+          record.semanticLabel = plane.semanticLabel || '';
+        }
+      }
+
+      for (const [plane, record] of state.planeRecords) {
+        if (!live.has(plane)) {
+          planeRoot.remove(record.mesh);
+          disposeObject(record.mesh);
+          state.planeRecords.delete(plane);
+          const idx = state.planeMeshes.indexOf(record.mesh);
+          if (idx >= 0) state.planeMeshes.splice(idx, 1);
+        }
+      }
+    }
+
+    function createPlaneRecord(plane) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: plane.orientation === 'vertical' ? 0xff6bd5 : 0x8dfcff,
+        transparent: true,
+        opacity: 0.20,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+      mesh.matrixAutoUpdate = false;
+      mesh.userData.isRoomPlane = true;
+      mesh.userData.orientation = plane.orientation || 'unknown';
+      mesh.visible = state.debugPlanes;
+      return { mesh, lastChangedTime: -1, orientation: plane.orientation || 'unknown', semanticLabel: plane.semanticLabel || '' };
+    }
+
+    function rebuildPlaneGeometry(record, plane) {
+      const points = Array.from(plane.polygon || []);
+      if (points.length < 3) return;
+      const verts = [];
+      const indices = [];
+      for (const p of points) verts.push(p.x, p.y || 0, p.z);
+      for (let i = 1; i < points.length - 1; i++) indices.push(0, i, i + 1);
+      record.mesh.geometry.dispose();
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      record.mesh.geometry = geo;
+      record.mesh.userData.orientation = plane.orientation || 'unknown';
+      record.mesh.material.color.set(plane.orientation === 'vertical' ? 0xff6bd5 : 0x8dfcff);
+    }
+
+    function updateReticle() {
+      let target = null;
+      if (state.xrActive) {
+        const controller = controller0.visible ? controller0 : controller1.visible ? controller1 : null;
+        if (controller) target = getControllerTarget(controller);
+      } else {
+        target = getCameraForwardFloorTarget();
+      }
+      if (target) {
+        reticle.visible = true;
+        reticle.position.copy(target.point).add(target.normal.clone().multiplyScalar(0.015));
+        alignYToNormal(reticle, target.normal);
+        const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.08;
+        reticle.scale.setScalar(pulse);
+      } else {
+        reticle.visible = false;
+      }
+    }
+
+    function getControllerTarget(controller) {
+      const ray = rayFromController(controller);
+      const planeHit = intersectRoomPlanes(ray.origin, ray.direction);
+      if (planeHit) return planeHit;
+      const floorHit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(floorPlane, floorHit)) {
+        if (floorHit.distanceTo(ray.origin) < 12 && floorHit.distanceTo(ray.origin) > 0.05) {
+          return { point: floorHit, normal: new THREE.Vector3(0, 1, 0), source: 'local-floor' };
+        }
+      }
+      const fallback = ray.origin.clone().add(ray.direction.clone().multiplyScalar(1.7));
+      fallback.y = Math.max(state.floorOffset, fallback.y - 0.9);
+      return { point: fallback, normal: new THREE.Vector3(0, 1, 0), source: 'fallback' };
+    }
+
+    function rayFromController(controller) {
+      tmpMatrix.identity().extractRotation(controller.matrixWorld);
+      const origin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
+      const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tmpMatrix).normalize();
+      raycaster.set(origin, direction);
+      return { origin, direction };
+    }
+
+    function getCameraForwardFloorTarget() {
+      const origin = camera.position.clone();
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      raycaster.set(origin, direction);
+      const hit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(floorPlane, hit)) {
+        if (hit.distanceTo(origin) < 15) return { point: hit, normal: new THREE.Vector3(0, 1, 0), source: 'desktop-floor' };
+      }
+      return null;
+    }
+
+    function getPointerTarget(event) {
+      const ndc = new THREE.Vector2(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      );
+      raycaster.setFromCamera(ndc, camera);
+      const planeHit = intersectRoomPlanes(raycaster.ray.origin, raycaster.ray.direction);
+      if (planeHit) return planeHit;
+      const hit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(floorPlane, hit)) return { point: hit, normal: new THREE.Vector3(0, 1, 0), source: 'desktop-floor' };
+      return null;
+    }
+
+    function intersectRoomPlanes(origin, direction) {
+      const pickables = state.planeMeshes.filter(m => m.geometry && m.geometry.attributes.position);
+      if (!pickables.length) return null;
+      raycaster.set(origin, direction);
+      const hits = raycaster.intersectObjects(pickables, false);
+      if (!hits.length) return null;
+      const hit = hits[0];
+      if (hit.distance > 12) return null;
+      const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
+      if (normal.y < 0) normal.multiplyScalar(-1);
+      return { point: hit.point.clone(), normal, source: 'room-plane', object: hit.object };
+    }
+
+    function actFromController(controller) {
+      unlockAudio();
+      const target = getControllerTarget(controller);
+      const ray = rayFromController(controller);
+      performAction(target, ray);
+    }
+
+    function onPointerDown(event) {
+      if (event.target.closest('.hud') || event.target.closest('#xrButtons')) return;
+      unlockAudio();
+      const target = getPointerTarget(event);
+      const ndc = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      performAction(target, { origin: raycaster.ray.origin.clone(), direction: raycaster.ray.direction.clone() });
+    }
+
+    function performAction(target, ray) {
+      if (state.actionCooldown > 0) return;
+      state.actionCooldown = 0.08;
+      if (!target) return;
+
+      if (state.mode === 'garden') {
+        plantBloom(target.point, target.normal, { large: false });
+        addScore(1);
+        playTone(260, 0.07, 'sine', 0.06);
+      } else if (state.mode === 'swarm') {
+        const hit = shootEnemy(ray.origin, ray.direction);
+        if (!hit) {
+          spawnShotLine(ray.origin, ray.direction, 0x8dfcff);
+          playNoise(0.045, 0.045);
+        }
+      } else {
+        const hit = shootEnemy(ray.origin, ray.direction);
+        if (!hit) plantBloom(target.point, target.normal, { large: false });
+      }
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      modeBadge.textContent = mode === 'garden' ? 'Garden' : mode === 'swarm' ? 'Swarm' : 'Hybrid';
+      gardenBtn.classList.toggle('primary', mode === 'garden');
+      swarmBtn.classList.toggle('hot', mode === 'swarm');
+      hybridBtn.classList.toggle('primary', mode === 'hybrid');
+      announce(mode === 'garden'
+        ? 'Garden mode: trigger plants a bloom on the floor or detected room plane.'
+        : mode === 'swarm'
+          ? 'Swarm mode: trigger shoots pests. Grip changes mode.'
+          : 'Hybrid mode: trigger shoots pests first; if nothing is hit, it plants a bloom.');
+    }
+
+    function cycleMode() {
+      const next = state.mode === 'garden' ? 'swarm' : state.mode === 'swarm' ? 'hybrid' : 'garden';
+      setMode(next);
+      playTone(520, 0.055, 'triangle', 0.04);
+    }
+
+    function bloomBurst() {
+      unlockAudio();
+      const center = state.xrActive ? getCameraWorldPosition().add(new THREE.Vector3(0, -1.35, -1.2).applyQuaternion(camera.quaternion)) : new THREE.Vector3(0, state.floorOffset, -1.2);
+      center.y = state.floorOffset;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const r = 0.55 + Math.random() * 1.6;
+        const p = center.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r));
+        plantBloom(p, new THREE.Vector3(0, 1, 0), { large: i % 3 === 0 });
+      }
+      addScore(12);
+      playChord([220, 330, 440], 0.14);
+    }
+
+    function plantBloom(point, normal, options = {}) {
+      const colorA = new THREE.Color().setHSL(Math.random(), 0.82, 0.62);
+      const colorB = new THREE.Color().setHSL((Math.random() + 0.46) % 1, 0.92, 0.66);
+      const scale = (options.large ? 1.25 : 0.72 + Math.random() * 0.55) * state.energy;
+      const group = new THREE.Group();
+      group.position.copy(point).add(normal.clone().multiplyScalar(0.03));
+      alignYToNormal(group, normal);
+      group.userData.age = 0;
+      group.userData.life = 999;
+      group.userData.finalScale = scale;
+      group.userData.phase = Math.random() * Math.PI * 2;
+      group.userData.data = { p: group.position.toArray(), n: normal.toArray(), s: scale, a: `#${colorA.getHexString()}`, b: `#${colorB.getHexString()}` };
+      group.scale.setScalar(0.001);
+
+      const stemMat = new THREE.MeshStandardMaterial({ color: colorA, roughness: 0.35, metalness: 0.06, emissive: colorA, emissiveIntensity: 0.28 });
+      const headMat = new THREE.MeshStandardMaterial({ color: colorB, roughness: 0.26, metalness: 0.04, emissive: colorB, emissiveIntensity: 0.45, transparent: true, opacity: 0.94 });
+      const ghostMat = new THREE.MeshBasicMaterial({ color: colorB, transparent: true, opacity: 0.24, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.034, 0.58, 10), stemMat);
+      stem.position.y = 0.29;
+      group.add(stem);
+
+      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 2), headMat);
+      core.position.y = 0.63;
+      group.add(core);
+
+      const petalCount = 8 + Math.floor(Math.random() * 8);
+      for (let i = 0; i < petalCount; i++) {
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 8), headMat.clone());
+        const angle = (i / petalCount) * Math.PI * 2;
+        petal.position.set(Math.cos(angle) * 0.16, 0.63 + Math.sin(i * 1.7) * 0.035, Math.sin(angle) * 0.16);
+        petal.rotation.set(Math.sin(angle) * 0.9, 0, -Math.cos(angle) * 0.9);
+        petal.scale.set(0.55, 0.18, 1.55);
+        group.add(petal);
+      }
+
+      const halo = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.28, 48), ghostMat);
+      halo.position.y = 0.63;
+      halo.rotation.x = Math.PI / 2;
+      group.add(halo);
+
+      const sparkCount = options.large ? 28 : 14;
+      for (let i = 0; i < sparkCount; i++) {
+        const spark = new THREE.Mesh(
+          new THREE.SphereGeometry(0.012 + Math.random() * 0.012, 8, 6),
+          new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? colorA : colorB, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending })
+        );
+        const a = Math.random() * Math.PI * 2;
+        const r = 0.10 + Math.random() * 0.55;
+        spark.position.set(Math.cos(a) * r, 0.32 + Math.random() * 0.6, Math.sin(a) * r);
+        spark.userData.orbit = { a, r, speed: 0.35 + Math.random() * 0.8 };
+        group.add(spark);
+      }
+
+      bloomRoot.add(group);
+      state.flowers.push(group);
+      if (state.flowers.length > 90) {
+        const old = state.flowers.shift();
+        bloomRoot.remove(old);
+        disposeObject(old);
+      }
+      spawnParticles(point.clone().add(normal.clone().multiplyScalar(0.2)), colorB.getHex(), 16, 1.0);
+      return group;
+    }
+
+    function updateBlooms(dt, t) {
+      for (const flower of state.flowers) {
+        flower.userData.age += dt;
+        const grow = Math.min(1, flower.userData.age / 0.8);
+        const eased = 1 - Math.pow(1 - grow, 3);
+        const final = flower.userData.finalScale;
+        const pulse = 1 + Math.sin(t * 2.0 + flower.userData.phase) * 0.018;
+        flower.scale.setScalar(final * eased * pulse);
+        flower.rotation.y += dt * 0.08;
+        let sparkIndex = 0;
+        for (const child of flower.children) {
+          if (child.userData.orbit) {
+            sparkIndex++;
+            const o = child.userData.orbit;
+            const a = o.a + t * o.speed;
+            child.position.x = Math.cos(a) * o.r;
+            child.position.z = Math.sin(a) * o.r;
+            child.position.y += Math.sin(t * 1.4 + sparkIndex) * 0.0008;
+          }
+        }
+      }
+    }
+
+    function updateEnemies(dt, t) {
+      const wanted = state.mode === 'garden' ? Math.max(0, state.pressure - 3) : 2 + state.pressure * 2;
+      state.spawnTimer -= dt;
+      if (state.enemies.length < wanted && state.spawnTimer <= 0) {
+        spawnEnemy();
+        state.spawnTimer = Math.max(0.35, 2.2 - state.pressure * 0.28);
+      }
+
+      for (let i = state.enemies.length - 1; i >= 0; i--) {
+        const enemy = state.enemies[i];
+        enemy.userData.age += dt;
+        const d = enemy.userData;
+        d.angle += dt * d.speed;
+        const bob = Math.sin(t * d.bobSpeed + d.seed) * 0.16;
+        enemy.position.x += Math.sin(t * 0.6 + d.seed) * dt * d.drift.x;
+        enemy.position.z += Math.cos(t * 0.7 + d.seed) * dt * d.drift.z;
+        enemy.position.y = d.baseY + bob;
+        enemy.rotation.x += dt * 1.2;
+        enemy.rotation.y += dt * 2.0;
+        enemy.scale.setScalar(d.radius * (1 + Math.sin(t * 5 + d.seed) * 0.08));
+
+        const distFromOrigin = Math.hypot(enemy.position.x, enemy.position.z);
+        if (distFromOrigin > 5.2) {
+          enemy.position.x *= 0.985;
+          enemy.position.z *= 0.985;
+          d.drift.x *= -0.8;
+          d.drift.z *= -0.8;
+        }
+
+        if (d.age > 35) removeEnemy(i);
+      }
+    }
+
+    function spawnEnemy() {
+      const color = new THREE.Color().setHSL(0.78 + Math.random() * 0.14, 0.95, 0.62);
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.16, 1),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.65, roughness: 0.22, metalness: 0.05 })
+      );
+      const shell = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 18, 10),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      group.add(body, shell);
+      const wingMat = new THREE.MeshBasicMaterial({ color: 0x8dfcff, transparent: true, opacity: 0.42, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+      for (let s of [-1, 1]) {
+        const wing = new THREE.Mesh(new THREE.CircleGeometry(0.16, 24), wingMat);
+        wing.position.x = s * 0.22;
+        wing.scale.set(1, 0.38, 1);
+        wing.rotation.y = s * 0.7;
+        group.add(wing);
+      }
+
+      const pos = chooseEnemySpawnPosition();
+      group.position.copy(pos);
+      const seed = Math.random() * 1000;
+      group.userData = {
+        age: 0,
+        seed,
+        baseY: pos.y,
+        radius: 0.9 + Math.random() * 0.35,
+        bobSpeed: 2.0 + Math.random() * 2.5,
+        speed: 1.2 + Math.random() * 1.8,
+        angle: Math.random() * Math.PI * 2,
+        drift: new THREE.Vector3((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9)
+      };
+      swarmRoot.add(group);
+      state.enemies.push(group);
+      return group;
+    }
+
+    function chooseEnemySpawnPosition() {
+      const verticals = state.planeMeshes.filter(m => m.userData.orientation === 'vertical');
+      if (verticals.length) {
+        const mesh = verticals[Math.floor(Math.random() * verticals.length)];
+        mesh.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(mesh);
+        if (Number.isFinite(box.min.x)) {
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+          center.x += (Math.random() - 0.5) * Math.min(size.x, 1.8);
+          center.y = Math.max(state.floorOffset + 0.55, Math.min(center.y + (Math.random() - 0.5) * Math.min(size.y, 1.4), state.floorOffset + 2.2));
+          center.z += (Math.random() - 0.5) * Math.min(size.z, 1.8);
+          return center;
+        }
+      }
+      const a = Math.random() * Math.PI * 2;
+      const r = 1.25 + Math.random() * 2.6;
+      return new THREE.Vector3(Math.cos(a) * r, state.floorOffset + 0.75 + Math.random() * 1.35, Math.sin(a) * r - 1.2);
+    }
+
+    function shootEnemy(origin, direction) {
+      let bestIndex = -1;
+      let bestScore = Infinity;
+      const o = origin.clone();
+      const d = direction.clone().normalize();
+      for (let i = 0; i < state.enemies.length; i++) {
+        const enemy = state.enemies[i];
+        const to = enemy.position.clone().sub(o);
+        const along = to.dot(d);
+        if (along < 0.05 || along > 12) continue;
+        const closest = o.clone().add(d.clone().multiplyScalar(along));
+        const dist = closest.distanceTo(enemy.position);
+        const hitRadius = 0.28 * enemy.userData.radius;
+        if (dist < hitRadius && along < bestScore) {
+          bestScore = along;
+          bestIndex = i;
+        }
+      }
+
+      spawnShotLine(origin, direction, bestIndex >= 0 ? 0xff6bd5 : 0x8dfcff);
+      if (bestIndex >= 0) {
+        const enemy = state.enemies[bestIndex];
+        spawnParticles(enemy.position, 0xff6bd5, 26, 1.7);
+        if (state.mode === 'hybrid') plantBloom(enemy.position.clone().setY(state.floorOffset), new THREE.Vector3(0, 1, 0), { large: false });
+        removeEnemy(bestIndex);
+        addScore(10 + state.pressure);
+        playChord([440, 660, 880], 0.08);
+        return true;
+      }
+      return false;
+    }
+
+    function removeEnemy(index) {
+      const enemy = state.enemies[index];
+      state.enemies.splice(index, 1);
+      swarmRoot.remove(enemy);
+      disposeObject(enemy);
+    }
+
+    function spawnShotLine(origin, direction, color) {
+      const length = 4.5;
+      const end = origin.clone().add(direction.clone().normalize().multiplyScalar(length));
+      const geo = new THREE.BufferGeometry().setFromPoints([origin, end]);
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending });
+      const line = new THREE.Line(geo, mat);
+      line.userData.life = 0.10;
+      line.userData.maxLife = 0.10;
+      particleRoot.add(line);
+      state.particles.push(line);
+    }
+
+    function spawnParticles(position, colorHex, count, force) {
+      for (let i = 0; i < count; i++) {
+        const p = new THREE.Mesh(
+          new THREE.SphereGeometry(0.018 + Math.random() * 0.035, 8, 6),
+          new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })
+        );
+        p.position.copy(position);
+        p.userData.velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * force,
+          (Math.random() * 0.8 + 0.1) * force,
+          (Math.random() - 0.5) * force
+        );
+        p.userData.life = 0.45 + Math.random() * 0.65;
+        p.userData.maxLife = p.userData.life;
+        particleRoot.add(p);
+        state.particles.push(p);
+      }
+    }
+
+    function updateParticles(dt) {
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.userData.life -= dt;
+        const f = Math.max(0, p.userData.life / p.userData.maxLife);
+        if (p.material) p.material.opacity = Math.min(p.material.opacity, f);
+        if (p.userData.velocity) {
+          p.userData.velocity.y -= dt * 0.55;
+          p.position.addScaledVector(p.userData.velocity, dt);
+          p.scale.setScalar(0.6 + f * 0.8);
+        }
+        if (p.userData.life <= 0) {
+          particleRoot.remove(p);
+          state.particles.splice(i, 1);
+          disposeObject(p);
+        }
+      }
+    }
+
+    function alignYToNormal(object, normal) {
+      const n = normal.clone().normalize();
+      tmpQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+      object.quaternion.copy(tmpQuat);
+    }
+
+    function getCameraWorldPosition() {
+      const pos = new THREE.Vector3();
+      camera.getWorldPosition(pos);
+      return pos;
+    }
+
+    function addScore(points) {
+      state.score += points;
+      if (state.score > state.best) {
+        state.best = state.score;
+        localStorage.setItem('roomBloomArenaBest', String(state.best));
+      }
+    }
+
+    function togglePlaneDebug() {
+      state.debugPlanes = !state.debugPlanes;
+      debugBtn.textContent = state.debugPlanes ? 'Planes on' : 'Planes off';
+      for (const record of state.planeRecords.values()) record.mesh.visible = state.debugPlanes;
+      announce(state.debugPlanes ? 'Plane debug is on. Cyan = horizontal surfaces, pink = vertical surfaces when available.' : 'Plane debug is off.');
+    }
+
+    async function initiateRoomCapture() {
+      const session = renderer.xr.getSession();
+      if (!session) {
+        announce('Enter AR first, then press Room scan. The button calls the browser room-capture method only during an active XR session.');
+        return;
+      }
+      if (typeof session.initiateRoomCapture !== 'function') {
+        announce('This browser session does not expose initiateRoomCapture(). Use the Quest room setup / mixed reality setup, then re-enter AR.');
+        return;
+      }
+      try {
+        announce('Starting Quest room capture... follow the headset prompt if it appears.');
+        await session.initiateRoomCapture();
+        state.roomCaptureTried = true;
+        announce('Room capture returned. Wait a few seconds for planes to populate, then try Planes on.');
+      } catch (err) {
+        announce(`Room capture did not complete: ${err?.message || err}`);
+      }
+    }
+
+    function saveGarden() {
+      const data = state.flowers.map(f => f.userData.data).filter(Boolean);
+      localStorage.setItem('roomBloomArenaGarden', JSON.stringify(data));
+      announce(`Saved ${data.length} blooms in local browser storage.`);
+    }
+
+    function loadGarden() {
+      const raw = localStorage.getItem('roomBloomArenaGarden');
+      if (!raw) {
+        announce('No saved garden found in this browser.');
+        return;
+      }
+      let data;
+      try { data = JSON.parse(raw); } catch { data = []; }
+      clearFlowers();
+      for (const item of data.slice(0, 90)) {
+        const p = new THREE.Vector3().fromArray(item.p || [0, state.floorOffset, 0]);
+        const n = new THREE.Vector3().fromArray(item.n || [0, 1, 0]);
+        const flower = plantBloom(p, n, { large: false });
+        flower.userData.finalScale = item.s || 0.7;
+      }
+      announce(`Loaded ${data.length} saved blooms. In AR this is local-space storage, not a permanent room anchor.`);
+    }
+
+    function clearFlowers() {
+      for (const flower of state.flowers) {
+        bloomRoot.remove(flower);
+        disposeObject(flower);
+      }
+      state.flowers.length = 0;
+    }
+
+    function resetArena() {
+      clearFlowers();
+      for (let i = state.enemies.length - 1; i >= 0; i--) removeEnemy(i);
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        particleRoot.remove(p);
+        disposeObject(p);
+      }
+      state.particles.length = 0;
+      state.score = 0;
+      state.spawnTimer = 0;
+      announce('Arena reset.');
+    }
+
+    function clearPlaneMeshes() {
+      for (const record of state.planeRecords.values()) {
+        planeRoot.remove(record.mesh);
+        disposeObject(record.mesh);
+      }
+      state.planeRecords.clear();
+      state.planeMeshes.length = 0;
+      state.hasPlaneSupport = false;
+    }
+
+    function toggleSound() {
+      state.muted = !state.muted;
+      muteBtn.textContent = state.muted ? 'Sound off' : 'Sound on';
+      announce(state.muted ? 'Sound muted.' : 'Sound enabled.');
+    }
+
+    function updateHud() {
+      scoreEl.textContent = state.score;
+      bestEl.textContent = state.best;
+      bloomEl.textContent = state.flowers.length;
+      planeEl.textContent = state.planeMeshes.length;
+    }
+
+    function announce(message) {
+      state.lastStatus = message;
+      const planeText = state.planeMeshes.length
+        ? `<span class="good">${state.planeMeshes.length} room plane${state.planeMeshes.length === 1 ? '' : 's'} visible to WebXR.</span>`
+        : state.xrActive && state.xrMode === 'ar'
+          ? '<span class="warn">No planes yet. Use Room scan or Quest room setup; floor fallback still works.</span>'
+          : '<span class="warn">Desktop/VR fallback uses a synthetic floor.</span>';
+      statusEl.innerHTML = `<strong>${escapeHtml(message)}</strong>\nMode: ${state.mode} | XR: ${state.xrMode} | ${planeText}`;
+    }
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onKeyDown(event) {
+      if (event.target && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return;
+      const key = event.key.toLowerCase();
+      if (key === '1') setMode('garden');
+      else if (key === '2') setMode('swarm');
+      else if (key === '3') setMode('hybrid');
+      else if (key === 'd') togglePlaneDebug();
+      else if (key === 'r') resetArena();
+      else if (key === 'b') bloomBurst();
+    }
+
+    function styleXRButton(btn, label) {
+      btn.textContent = label;
+      btn.style.position = 'relative';
+      btn.style.bottom = 'auto';
+      btn.style.left = 'auto';
+      btn.style.right = 'auto';
+      btn.style.margin = '0 0 8px auto';
+      btn.style.borderRadius = '999px';
+      btn.style.border = '1px solid rgba(141,252,255,0.5)';
+      btn.style.background = 'rgba(9, 13, 27, 0.82)';
+      btn.style.color = '#eef5ff';
+      btn.style.font = '800 12px ui-sans-serif, system-ui, sans-serif';
+      btn.style.letterSpacing = '0.08em';
+      btn.style.padding = '12px 16px';
+      btn.style.boxShadow = '0 14px 40px rgba(0,0,0,0.35)';
+      btn.style.backdropFilter = 'blur(12px)';
+      btn.style.WebkitBackdropFilter = 'blur(12px)';
+    }
+
+    function disposeObject(object) {
+      object.traverse?.(child => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+          else child.material.dispose();
+        }
+      });
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    let audioCtx = null;
+    function unlockAudio() {
+      if (state.muted) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playTone(freq, duration = 0.08, type = 'sine', gain = 0.05) {
+      if (state.muted) return;
+      unlockAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.55, now + duration);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(g).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+
+    function playChord(freqs, duration = 0.12) {
+      freqs.forEach((f, i) => setTimeout(() => playTone(f, duration, i % 2 ? 'triangle' : 'sine', 0.035), i * 18));
+    }
+
+    function playNoise(duration = 0.05, gainAmount = 0.04) {
+      if (state.muted) return;
+      unlockAudio();
+      if (!audioCtx) return;
+      const len = Math.floor(audioCtx.sampleRate * duration);
+      const buffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = audioCtx.createBufferSource();
+      const g = audioCtx.createGain();
+      g.gain.value = gainAmount;
+      src.buffer = buffer;
+      src.connect(g).connect(audioCtx.destination);
+      src.start();
+    }
+  </script>
+</body>
+</html>
