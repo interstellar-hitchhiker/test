@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#080b12" />
+  <title>Reality Bloom — WebXR Garden</title>
+  <style>
+    :root {
+      --bg0: #050712;
+      --bg1: #111a31;
+      --panel: rgba(8, 12, 22, 0.78);
+      --panel-strong: rgba(14, 20, 36, 0.9);
+      --text: #eef5ff;
+      --muted: #aab7d4;
+      --soft: rgba(255,255,255,0.1);
+      --line: rgba(255,255,255,0.16);
+      --hot: #a7f7ff;
+      --good: #b7ffca;
+      --warn: #ffd37a;
+      --danger: #ff8da1;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(72, 106, 185, 0.34), transparent 38%),
+        radial-gradient(circle at 80% 82%, rgba(117, 53, 178, 0.24), transparent 34%),
+        linear-gradient(180deg, var(--bg1), var(--bg0) 62%, #02040a);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hud {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top));
+      left: max(14px, env(safe-area-inset-left));
+      width: min(410px, calc(100vw - 28px));
+      max-height: calc(100vh - 28px);
+      overflow: auto;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      backdrop-filter: blur(18px) saturate(1.2);
+      -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
+      user-select: none;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .orb {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 36% 28%, #ffffff 0 6%, #b8fbff 7% 18%, transparent 19%),
+        radial-gradient(circle at 68% 68%, rgba(255, 127, 206, 0.9), transparent 34%),
+        radial-gradient(circle at 34% 72%, rgba(171, 255, 173, 0.92), transparent 36%),
+        linear-gradient(135deg, #53e5ff, #995eff 48%, #ff72bb);
+      box-shadow: 0 0 26px rgba(119, 232, 255, 0.72), inset 0 0 22px rgba(255,255,255,0.28);
+      flex: 0 0 auto;
+      animation: breathe 3.8s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); filter: hue-rotate(0deg); }
+      50% { transform: scale(1.08); filter: hue-rotate(28deg); }
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .tagline {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .instructions {
+      margin: 12px 0 14px;
+      padding: 12px;
+      border: 1px solid rgba(167, 247, 255, 0.18);
+      border-radius: 16px;
+      background: rgba(167, 247, 255, 0.065);
+      color: #dcecff;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 11px 12px;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.055));
+      font: inherit;
+      font-size: 13px;
+      font-weight: 760;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 8px 22px rgba(0,0,0,0.2);
+      transition: transform 130ms ease, border-color 130ms ease, background 130ms ease, opacity 130ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(167, 247, 255, 0.55);
+      background: linear-gradient(180deg, rgba(167,247,255,0.2), rgba(255,255,255,0.075));
+    }
+
+    button:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+    button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .primary {
+      background: linear-gradient(180deg, rgba(99, 222, 255, 0.34), rgba(126, 98, 255, 0.22));
+      border-color: rgba(167, 247, 255, 0.4);
+    }
+
+    .danger {
+      background: linear-gradient(180deg, rgba(255, 118, 144, 0.23), rgba(255,255,255,0.055));
+      border-color: rgba(255, 141, 161, 0.34);
+    }
+
+    .section-title {
+      margin: 14px 0 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin: 11px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    label b {
+      color: var(--text);
+      font-weight: 760;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--hot);
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      min-height: 54px;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.055);
+    }
+
+    .stat small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bottom-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 92px;
+      transform: translateX(-50%) translateY(18px);
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(8, 12, 22, 0.82);
+      color: var(--text);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.38);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      z-index: 20;
+      white-space: nowrap;
+      max-width: calc(100vw - 32px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 13px;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .xr-buttons {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      z-index: 30;
+      pointer-events: auto;
+    }
+
+    .xr-buttons button,
+    #ARButton,
+    #VRButton {
+      position: static !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      top: auto !important;
+      width: auto !important;
+      min-width: 138px !important;
+      height: auto !important;
+      min-height: 42px !important;
+      padding: 11px 16px !important;
+      border-radius: 999px !important;
+      border: 1px solid rgba(167,247,255,0.36) !important;
+      background: rgba(10, 15, 28, 0.82) !important;
+      color: #eef5ff !important;
+      font: 800 13px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important;
+      box-shadow: 0 14px 38px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+    }
+
+    .crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 28px;
+      height: 28px;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(167,247,255,0.55);
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.6;
+      z-index: 2;
+      box-shadow: 0 0 22px rgba(167,247,255,0.28);
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      background: rgba(167,247,255,0.56);
+      transform: translate(-50%, -50%);
+    }
+
+    .crosshair::before { width: 12px; height: 1px; }
+    .crosshair::after { width: 1px; height: 12px; }
+
+    body.xr-active .hud { opacity: 0.86; }
+    body.xr-active .crosshair { display: none; }
+
+    @media (max-width: 720px) {
+      .hud {
+        top: 10px;
+        left: 10px;
+        width: calc(100vw - 20px);
+        padding: 13px;
+      }
+      .brand { gap: 10px; }
+      .orb { width: 36px; height: 36px; }
+      h1 { font-size: 19px; }
+      .instructions { display: none; }
+      .status { grid-template-columns: repeat(3, 1fr); }
+      .stat { min-height: 48px; }
+      .bottom-note { display: none; }
+      .xr-buttons { bottom: 12px; width: calc(100vw - 16px); }
+      #ARButton, #VRButton { min-width: 128px !important; }
+    }
+
+    @media (max-height: 660px) {
+      .bottom-note, .instructions { display: none; }
+      .hud { max-height: calc(100vh - 86px); }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="stage" aria-label="Reality Bloom WebXR scene"></main>
+
+  <aside class="hud" id="hud">
+    <div class="brand">
+      <div class="orb" aria-hidden="true"></div>
+      <div>
+        <h1>Reality Bloom</h1>
+        <p class="tagline">Plant glowing procedural life in browser space, VR, or Quest passthrough.</p>
+      </div>
+    </div>
+
+    <p class="instructions">
+      On desktop, click the scene or use <strong>Plant seed</strong>. In Quest, open this page in the browser, enter AR or VR, then use the trigger to grow blooms around you.
+    </p>
+
+    <div class="button-grid">
+      <button class="primary" id="plantBtn">Plant seed</button>
+      <button id="burstBtn">Bloom burst</button>
+      <button id="autoBtn">Garden mode: off</button>
+      <button id="soundBtn">Sound: on</button>
+      <button id="saveBtn">Save garden</button>
+      <button class="danger" id="clearBtn">Clear</button>
+    </div>
+
+    <div class="section-title">Growth controls</div>
+    <label>
+      <span>Bloom size</span>
+      <b id="sizeLabel">1.00</b>
+      <input id="sizeSlider" type="range" min="0.45" max="1.75" value="1" step="0.01" />
+    </label>
+    <label>
+      <span>Motion</span>
+      <b id="motionLabel">0.60</b>
+      <input id="motionSlider" type="range" min="0" max="1.4" value="0.6" step="0.01" />
+    </label>
+    <label>
+      <span>Colour drift</span>
+      <b id="hueLabel">0.55</b>
+      <input id="hueSlider" type="range" min="0" max="1" value="0.55" step="0.01" />
+    </label>
+    <label>
+      <span>Particle mist</span>
+      <b id="mistLabel">0.70</b>
+      <input id="mistSlider" type="range" min="0" max="1" value="0.7" step="0.01" />
+    </label>
+
+    <div class="status">
+      <div class="stat"><small>Blooms</small><strong id="countStat">0</strong></div>
+      <div class="stat"><small>Mode</small><strong id="modeStat">Flat</strong></div>
+      <div class="stat"><small>Saved</small><strong id="saveStat">No</strong></div>
+    </div>
+
+    <p class="bottom-note">
+      GitHub Pages is the clean path for Quest. CDN libraries need internet; the procedural plants, particles, and sound are generated in this file.
+    </p>
+  </aside>
+
+  <div class="crosshair" aria-hidden="true"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="xr-buttons" id="xrButtons" aria-label="WebXR launch buttons"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { ARButton } from 'three/addons/webxr/ARButton.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    const stage = document.getElementById('stage');
+    const xrButtons = document.getElementById('xrButtons');
+    const plantBtn = document.getElementById('plantBtn');
+    const burstBtn = document.getElementById('burstBtn');
+    const autoBtn = document.getElementById('autoBtn');
+    const soundBtn = document.getElementById('soundBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const toast = document.getElementById('toast');
+    const countStat = document.getElementById('countStat');
+    const modeStat = document.getElementById('modeStat');
+    const saveStat = document.getElementById('saveStat');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const motionSlider = document.getElementById('motionSlider');
+    const hueSlider = document.getElementById('hueSlider');
+    const mistSlider = document.getElementById('mistSlider');
+    const sizeLabel = document.getElementById('sizeLabel');
+    const motionLabel = document.getElementById('motionLabel');
+    const hueLabel = document.getElementById('hueLabel');
+    const mistLabel = document.getElementById('mistLabel');
+
+    const MAX_BLOOMS = 130;
+    const SAVE_KEY = 'reality-bloom-garden-v1';
+    const POINTER_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+    const clock = new THREE.Clock();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const tempVec = new THREE.Vector3();
+    const tempQuat = new THREE.Quaternion();
+    const tempMatrix = new THREE.Matrix4();
+    const cameraForward = new THREE.Vector3();
+
+    let blooms = [];
+    let twinkles = [];
+    let autoGarden = false;
+    let autoTimer = 0;
+    let soundOn = true;
+    let audioCtx = null;
+    let xrMode = 'Flat';
+    let hueBase = Math.random();
+
+    const scene = new THREE.Scene();
+    scene.background = null;
+    scene.fog = new THREE.FogExp2(0x070a12, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.03, 80);
+    camera.position.set(0, 1.55, 4.25);
+    camera.lookAt(0, 1, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.xr.enabled = true;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    stage.appendChild(renderer.domElement);
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const ambient = new THREE.HemisphereLight(0xcfefff, 0x141421, 1.25);
+    scene.add(ambient);
+
+    const key = new THREE.DirectionalLight(0xffffff, 2.3);
+    key.position.set(4, 7, 5);
+    key.castShadow = true;
+    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.camera.near = 0.4;
+    key.shadow.camera.far = 20;
+    key.shadow.camera.left = -8;
+    key.shadow.camera.right = 8;
+    key.shadow.camera.top = 8;
+    key.shadow.camera.bottom = -8;
+    scene.add(key);
+
+    const rim = new THREE.PointLight(0x8bdfff, 2.3, 13, 1.8);
+    rim.position.set(-2.5, 2.5, 2.5);
+    scene.add(rim);
+
+    const floor = buildFloor();
+    scene.add(floor);
+
+    const starField = buildStarField();
+    scene.add(starField);
+
+    const reticle = buildReticle();
+    scene.add(reticle);
+
+    const controller0 = renderer.xr.getController(0);
+    const controller1 = renderer.xr.getController(1);
+    controller0.addEventListener('selectstart', () => plantFromController(controller0));
+    controller1.addEventListener('selectstart', () => plantFromController(controller1));
+    scene.add(controller0, controller1);
+    addControllerRay(controller0);
+    addControllerRay(controller1);
+
+    setupXRButtons();
+    setupEvents();
+    updateLabels();
+    loadSavedGarden({ silent: true });
+    if (blooms.length === 0) seedWelcomeGarden();
+
+    renderer.setAnimationLoop(render);
+
+    function setupXRButtons() {
+      const sessionInit = {
+        optionalFeatures: ['local-floor', 'bounded-floor', 'dom-overlay'],
+        domOverlay: { root: document.body }
+      };
+
+      const ar = ARButton.createButton(renderer, sessionInit);
+      const vr = VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'bounded-floor'] });
+      xrButtons.appendChild(ar);
+      xrButtons.appendChild(vr);
+      polishXRButton(ar, 'Enter AR');
+      polishXRButton(vr, 'Enter VR');
+
+      renderer.xr.addEventListener('sessionstart', () => {
+        document.body.classList.add('xr-active');
+        const session = renderer.xr.getSession();
+        xrMode = session?.environmentBlendMode === 'opaque' ? 'VR' : 'AR';
+        modeStat.textContent = xrMode;
+        toastMessage(`${xrMode} mode ready. Use trigger to plant.`);
+      });
+
+      renderer.xr.addEventListener('sessionend', () => {
+        document.body.classList.remove('xr-active');
+        xrMode = 'Flat';
+        modeStat.textContent = xrMode;
+        toastMessage('Back to flat browser mode.');
+      });
+    }
+
+    function polishXRButton(button, fallbackText) {
+      button.setAttribute('aria-label', fallbackText);
+      button.addEventListener('click', ensureAudio, { passive: true });
+      window.setTimeout(() => {
+        if (button.textContent.trim() === '') button.textContent = fallbackText;
+      }, 100);
+    }
+
+    function setupEvents() {
+      window.addEventListener('resize', onResize);
+      renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: false });
+      renderer.domElement.addEventListener('pointermove', onPointerMove, { passive: false });
+
+      plantBtn.addEventListener('click', () => plantInFront(true));
+      burstBtn.addEventListener('click', bloomBurst);
+      autoBtn.addEventListener('click', toggleGardenMode);
+      soundBtn.addEventListener('click', toggleSound);
+      saveBtn.addEventListener('click', saveGarden);
+      clearBtn.addEventListener('click', clearGarden);
+
+      for (const slider of [sizeSlider, motionSlider, hueSlider, mistSlider]) {
+        slider.addEventListener('input', updateLabels);
+      }
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'p' || event.code === 'Space') {
+          event.preventDefault();
+          plantInFront(true);
+        } else if (event.key.toLowerCase() === 'b') {
+          bloomBurst();
+        } else if (event.key.toLowerCase() === 'g') {
+          toggleGardenMode();
+        } else if (event.key.toLowerCase() === 'c') {
+          clearGarden();
+        }
+      });
+    }
+
+    function buildFloor() {
+      const group = new THREE.Group();
+      const circle = new THREE.Mesh(
+        new THREE.CircleGeometry(7.5, 96),
+        new THREE.MeshStandardMaterial({
+          color: 0x0a1323,
+          roughness: 0.92,
+          metalness: 0.02,
+          transparent: true,
+          opacity: 0.28,
+          side: THREE.DoubleSide
+        })
+      );
+      circle.rotation.x = -Math.PI / 2;
+      circle.receiveShadow = true;
+      group.add(circle);
+
+      const grid = new THREE.GridHelper(15, 30, 0x64eaff, 0x254066);
+      grid.material.transparent = true;
+      grid.material.opacity = 0.18;
+      group.add(grid);
+      return group;
+    }
+
+    function buildStarField() {
+      const count = 460;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const color = new THREE.Color();
+      for (let i = 0; i < count; i++) {
+        const r = 9 + Math.random() * 17;
+        const theta = Math.random() * Math.PI * 2;
+        const y = Math.random() * 8.5 + 0.25;
+        positions[i * 3 + 0] = Math.cos(theta) * r;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = Math.sin(theta) * r;
+        color.setHSL((0.48 + Math.random() * 0.42) % 1, 0.85, 0.62 + Math.random() * 0.24);
+        colors[i * 3 + 0] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      const mat = new THREE.PointsMaterial({
+        size: 0.035,
+        sizeAttenuation: true,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      return new THREE.Points(geo, mat);
+    }
+
+    function buildReticle() {
+      const group = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.12, 0.006, 8, 48),
+        new THREE.MeshBasicMaterial({ color: 0xa7f7ff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      group.add(ring);
+      group.visible = true;
+      return group;
+    }
+
+    function addControllerRay(controller) {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -1.7)
+      ]);
+      const material = new THREE.LineBasicMaterial({ color: 0xa7f7ff, transparent: true, opacity: 0.75 });
+      const line = new THREE.Line(geometry, material);
+      line.name = 'planting-ray';
+      controller.add(line);
+
+      const bead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.82 })
+      );
+      bead.position.z = -1.7;
+      controller.add(bead);
+    }
+
+    function onPointerDown(event) {
+      event.preventDefault();
+      ensureAudio();
+      const p = pointFromScreen(event.clientX, event.clientY);
+      if (p) plantBloom(p, { source: 'click' });
+    }
+
+    function onPointerMove(event) {
+      const p = pointFromScreen(event.clientX, event.clientY);
+      if (p) {
+        reticle.position.copy(p).add(new THREE.Vector3(0, 0.012, 0));
+        reticle.visible = xrMode === 'Flat';
+      }
+    }
+
+    function pointFromScreen(x, y) {
+      pointer.x = (x / window.innerWidth) * 2 - 1;
+      pointer.y = -(y / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(POINTER_PLANE, hit)) {
+        hit.x = THREE.MathUtils.clamp(hit.x, -5.5, 5.5);
+        hit.z = THREE.MathUtils.clamp(hit.z, -5.5, 5.5);
+        return hit;
+      }
+      return null;
+    }
+
+    function plantInFront(showToast = false) {
+      ensureAudio();
+      camera.getWorldDirection(cameraForward);
+      const p = camera.position.clone().addScaledVector(cameraForward, 2.25);
+      p.y = 0;
+      p.x += (Math.random() - 0.5) * 0.35;
+      p.z += (Math.random() - 0.5) * 0.35;
+      plantBloom(p, { source: 'button' });
+      if (showToast) toastMessage('Seed planted.');
+    }
+
+    function plantFromController(controller) {
+      ensureAudio();
+      const p = pointFromController(controller);
+      plantBloom(p, { source: 'controller' });
+    }
+
+    function pointFromController(controller) {
+      controller.updateMatrixWorld(true);
+      const origin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+      const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix).normalize();
+      const denom = direction.y;
+      if (Math.abs(denom) > 0.08) {
+        const t = -origin.y / denom;
+        if (t > 0.18 && t < 5.8) {
+          return origin.clone().addScaledVector(direction, t);
+        }
+      }
+      return origin.clone().addScaledVector(direction, 1.65);
+    }
+
+    function bloomBurst() {
+      ensureAudio();
+      const center = getSceneCenter();
+      const total = 8;
+      for (let i = 0; i < total; i++) {
+        const a = (i / total) * Math.PI * 2 + Math.random() * 0.25;
+        const r = 0.55 + Math.random() * 1.15;
+        const p = new THREE.Vector3(center.x + Math.cos(a) * r, 0, center.z + Math.sin(a) * r);
+        window.setTimeout(() => plantBloom(p, { source: 'burst', quiet: i > 0 }), i * 95);
+      }
+      toastMessage('Bloom burst released.');
+    }
+
+    function getSceneCenter() {
+      if (xrMode !== 'Flat') {
+        const xrCam = renderer.xr.getCamera(camera);
+        xrCam.getWorldPosition(tempVec);
+        xrCam.getWorldDirection(cameraForward);
+        return tempVec.clone().addScaledVector(cameraForward, 1.7);
+      }
+      camera.getWorldDirection(cameraForward);
+      return camera.position.clone().addScaledVector(cameraForward, 2.1);
+    }
+
+    function plantBloom(position, options = {}) {
+      const variant = makeVariant();
+      const bloom = createBloom(position, variant);
+      root.add(bloom.group);
+      blooms.push(bloom);
+      trimBlooms();
+      burstTwinkles(position.clone().add(new THREE.Vector3(0, 0.35, 0)), variant.color, 18 + Math.floor(24 * Number(mistSlider.value)));
+      if (!options.quiet) playTone(variant.hue, 0.12, 0.14);
+      updateStats();
+      saveStat.textContent = 'No';
+    }
+
+    function makeVariant() {
+      hueBase = (hueBase + 0.073 + Math.random() * 0.06 * Number(hueSlider.value)) % 1;
+      const hue = (hueBase + (Math.random() - 0.5) * 0.34 * Number(hueSlider.value)) % 1;
+      const color = new THREE.Color().setHSL((hue + 1) % 1, 0.82 + Math.random() * 0.14, 0.55 + Math.random() * 0.18);
+      const accent = new THREE.Color().setHSL((hue + 0.15 + Math.random() * 0.25) % 1, 0.9, 0.7);
+      return {
+        hue,
+        color,
+        accent,
+        petals: 5 + Math.floor(Math.random() * 8),
+        rings: 1 + Math.floor(Math.random() * 3),
+        height: (0.46 + Math.random() * 0.95) * Number(sizeSlider.value),
+        spread: (0.2 + Math.random() * 0.45) * Number(sizeSlider.value),
+        twist: (Math.random() - 0.5) * Math.PI * 0.7,
+        seed: Math.random() * 9999,
+        style: Math.random()
+      };
+    }
+
+    function createBloom(position, variant) {
+      const group = new THREE.Group();
+      group.position.copy(position);
+      group.rotation.y = Math.random() * Math.PI * 2;
+      group.scale.setScalar(0.001);
+
+      const stemMat = new THREE.MeshStandardMaterial({
+        color: variant.color.clone().lerp(new THREE.Color(0xffffff), 0.1),
+        emissive: variant.color,
+        emissiveIntensity: 0.18,
+        roughness: 0.64,
+        metalness: 0.04
+      });
+      const petalMat = new THREE.MeshStandardMaterial({
+        color: variant.color,
+        emissive: variant.color,
+        emissiveIntensity: 0.32,
+        roughness: 0.42,
+        metalness: 0.02,
+        transparent: true,
+        opacity: 0.92,
+        side: THREE.DoubleSide
+      });
+      const accentMat = new THREE.MeshStandardMaterial({
+        color: variant.accent,
+        emissive: variant.accent,
+        emissiveIntensity: 0.38,
+        roughness: 0.5,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.88
+      });
+      const glowMat = makeGlowMaterial(variant.color, 0.78);
+
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(Math.sin(variant.seed) * 0.035, variant.height * 0.36, Math.cos(variant.seed) * 0.035),
+        new THREE.Vector3(Math.cos(variant.seed * 0.37) * 0.09, variant.height * 0.72, Math.sin(variant.seed * 0.23) * 0.09),
+        new THREE.Vector3(0, variant.height, 0)
+      ]);
+      const stem = new THREE.Mesh(new THREE.TubeGeometry(curve, 18, 0.015 + variant.spread * 0.035, 8, false), stemMat);
+      stem.castShadow = true;
+      group.add(stem);
+
+      const head = new THREE.Group();
+      head.position.set(0, variant.height, 0);
+      group.add(head);
+
+      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.075 + variant.spread * 0.12, 2), accentMat);
+      core.castShadow = true;
+      head.add(core);
+
+      for (let ring = 0; ring < variant.rings; ring++) {
+        const ringScale = 1 + ring * 0.48;
+        const yOffset = -ring * 0.035;
+        for (let i = 0; i < variant.petals; i++) {
+          const a = (i / variant.petals) * Math.PI * 2 + ring * 0.28 + variant.twist;
+          const petal = makePetalMesh(variant, petalMat, ringScale, ring);
+          petal.position.set(Math.cos(a) * variant.spread * 0.38 * ringScale, yOffset, Math.sin(a) * variant.spread * 0.38 * ringScale);
+          petal.rotation.set(Math.PI * 0.18 + ring * 0.12, -a + Math.PI / 2, Math.PI * 0.08 + Math.sin(variant.seed + i) * 0.18);
+          petal.scale.setScalar(0.78 + Math.random() * 0.36);
+          petal.castShadow = true;
+          head.add(petal);
+        }
+      }
+
+      const halo = new THREE.Sprite(glowMat);
+      halo.scale.setScalar(0.65 + variant.spread * 1.9);
+      halo.position.y = 0.02;
+      head.add(halo);
+
+      const aura = new THREE.Mesh(
+        new THREE.TorusGeometry(variant.spread * 0.7 + 0.16, 0.006, 8, 80),
+        new THREE.MeshBasicMaterial({ color: variant.accent, transparent: true, opacity: 0.54, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      aura.rotation.x = Math.PI / 2;
+      aura.position.y = -variant.height + 0.018;
+      head.add(aura);
+
+      const data = {
+        group,
+        head,
+        core,
+        aura,
+        variant,
+        born: clock.elapsedTime,
+        targetScale: 1,
+        swaySeed: Math.random() * 100,
+        saved: {
+          x: Number(position.x.toFixed(4)),
+          y: Number(position.y.toFixed(4)),
+          z: Number(position.z.toFixed(4)),
+          hue: Number(variant.hue.toFixed(5)),
+          petals: variant.petals,
+          rings: variant.rings,
+          height: Number(variant.height.toFixed(4)),
+          spread: Number(variant.spread.toFixed(4)),
+          twist: Number(variant.twist.toFixed(4)),
+          seed: Number(variant.seed.toFixed(4)),
+          style: Number(variant.style.toFixed(4))
+        }
+      };
+      return data;
+    }
+
+    function makePetalMesh(variant, material, ringScale, ring) {
+      if (variant.style < 0.36) {
+        const geo = new THREE.SphereGeometry(0.09 * ringScale, 18, 10);
+        geo.scale(0.55, 0.16, 1.95 + ring * 0.22);
+        return new THREE.Mesh(geo, material);
+      }
+      if (variant.style < 0.72) {
+        const geo = new THREE.ConeGeometry(0.06 * ringScale, 0.36 * ringScale, 5, 1, true);
+        geo.translate(0, 0, 0.16 * ringScale);
+        geo.rotateX(Math.PI / 2);
+        return new THREE.Mesh(geo, material);
+      }
+      const geo = new THREE.TorusKnotGeometry(0.055 * ringScale, 0.012 * ringScale, 48, 6, 2, 3);
+      geo.scale(1.2, 0.52, 1.9);
+      return new THREE.Mesh(geo, material);
+    }
+
+    function makeGlowMaterial(color, opacity) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 62);
+      const c = `rgb(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)})`;
+      g.addColorStop(0, `rgba(255,255,255,${opacity})`);
+      g.addColorStop(0.16, `rgba(${Math.round(color.r * 255)},${Math.round(color.g * 255)},${Math.round(color.b * 255)},${opacity * 0.8})`);
+      g.addColorStop(0.52, `rgba(${Math.round(color.r * 255)},${Math.round(color.g * 255)},${Math.round(color.b * 255)},${opacity * 0.22})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return new THREE.SpriteMaterial({ map: tex, color: c, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+    }
+
+    function burstTwinkles(position, color, count) {
+      for (let i = 0; i < count; i++) {
+        const dir = new THREE.Vector3(
+          (Math.random() - 0.5) * 1.2,
+          Math.random() * 1.1 + 0.15,
+          (Math.random() - 0.5) * 1.2
+        ).normalize();
+        const speed = 0.18 + Math.random() * 0.7;
+        const sprite = new THREE.Sprite(makeGlowMaterial(color, 0.55));
+        sprite.position.copy(position);
+        sprite.scale.setScalar(0.04 + Math.random() * 0.12);
+        root.add(sprite);
+        twinkles.push({ sprite, velocity: dir.multiplyScalar(speed), life: 0, max: 0.8 + Math.random() * 1.2, base: sprite.scale.x });
+      }
+      while (twinkles.length > 420) {
+        const t = twinkles.shift();
+        root.remove(t.sprite);
+        disposeObject(t.sprite);
+      }
+    }
+
+    function trimBlooms() {
+      while (blooms.length > MAX_BLOOMS) {
+        const bloom = blooms.shift();
+        root.remove(bloom.group);
+        disposeObject(bloom.group);
+      }
+    }
+
+    function clearGarden() {
+      for (const bloom of blooms) {
+        root.remove(bloom.group);
+        disposeObject(bloom.group);
+      }
+      blooms = [];
+      for (const t of twinkles) {
+        root.remove(t.sprite);
+        disposeObject(t.sprite);
+      }
+      twinkles = [];
+      localStorage.removeItem(SAVE_KEY);
+      saveStat.textContent = 'No';
+      updateStats();
+      toastMessage('Garden cleared.');
+    }
+
+    function saveGarden() {
+      const payload = blooms.map(b => b.saved);
+      localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+      saveStat.textContent = 'Yes';
+      toastMessage(`Saved ${payload.length} bloom${payload.length === 1 ? '' : 's'} on this browser.`);
+    }
+
+    function loadSavedGarden({ silent = false } = {}) {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return;
+        const list = JSON.parse(raw);
+        if (!Array.isArray(list)) return;
+        for (const item of list.slice(0, MAX_BLOOMS)) {
+          const variant = variantFromSaved(item);
+          const bloom = createBloom(new THREE.Vector3(item.x, item.y, item.z), variant);
+          root.add(bloom.group);
+          bloom.group.scale.setScalar(1);
+          bloom.born = -999;
+          blooms.push(bloom);
+        }
+        saveStat.textContent = list.length ? 'Yes' : 'No';
+        updateStats();
+        if (!silent) toastMessage('Saved garden loaded.');
+      } catch (error) {
+        console.warn('Could not load saved garden', error);
+      }
+    }
+
+    function variantFromSaved(item) {
+      const hue = Number(item.hue ?? Math.random());
+      const color = new THREE.Color().setHSL((hue + 1) % 1, 0.86, 0.62);
+      const accent = new THREE.Color().setHSL((hue + 0.21) % 1, 0.92, 0.72);
+      return {
+        hue,
+        color,
+        accent,
+        petals: Number(item.petals ?? 8),
+        rings: Number(item.rings ?? 2),
+        height: Number(item.height ?? 0.9),
+        spread: Number(item.spread ?? 0.35),
+        twist: Number(item.twist ?? 0),
+        seed: Number(item.seed ?? Math.random() * 9999),
+        style: Number(item.style ?? Math.random())
+      };
+    }
+
+    function seedWelcomeGarden() {
+      const positions = [
+        new THREE.Vector3(-0.65, 0, -0.45),
+        new THREE.Vector3(0.55, 0, -0.72),
+        new THREE.Vector3(0.02, 0, -1.18)
+      ];
+      for (const p of positions) plantBloom(p, { quiet: true });
+      saveStat.textContent = 'No';
+      toastMessage('Click to plant. Quest users can enter AR or VR.');
+    }
+
+    function toggleGardenMode() {
+      autoGarden = !autoGarden;
+      autoBtn.textContent = `Garden mode: ${autoGarden ? 'on' : 'off'}`;
+      toastMessage(autoGarden ? 'Garden mode will plant gently around you.' : 'Garden mode paused.');
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      soundBtn.textContent = `Sound: ${soundOn ? 'on' : 'off'}`;
+      if (soundOn) ensureAudio();
+      toastMessage(`Sound ${soundOn ? 'on' : 'off'}.`);
+    }
+
+    function ensureAudio() {
+      if (!soundOn) return;
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playTone(hue, duration = 0.1, gainLevel = 0.09) {
+      if (!soundOn) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const freq = 220 + hue * 520 + Math.random() * 50;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.8, now + duration);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1200 + hue * 2600, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(gainLevel, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration + 0.12);
+      osc.connect(filter).connect(gain).connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.16);
+    }
+
+    function render() {
+      const dt = Math.min(clock.getDelta(), 0.04);
+      const t = clock.elapsedTime;
+      const motion = Number(motionSlider.value);
+      const mist = Number(mistSlider.value);
+
+      starField.rotation.y += dt * 0.014;
+      floor.rotation.y += dt * 0.005;
+      rim.position.x = Math.sin(t * 0.23) * 3.2;
+      rim.position.z = Math.cos(t * 0.18) * 3.2;
+      rim.intensity = 1.8 + Math.sin(t * 0.7) * 0.45;
+
+      for (const bloom of blooms) {
+        const age = t - bloom.born;
+        const grow = bloom.born < 0 ? 1 : easeOutBack(Math.min(1, age / 1.15));
+        const sway = Math.sin(t * (0.65 + motion * 0.8) + bloom.swaySeed) * 0.035 * motion;
+        bloom.group.scale.setScalar(grow);
+        bloom.group.rotation.z = sway;
+        bloom.head.rotation.y += dt * (0.12 + motion * 0.28 + bloom.variant.style * 0.16);
+        bloom.core.scale.setScalar(1 + Math.sin(t * 2.1 + bloom.swaySeed) * 0.08 * motion);
+        bloom.aura.rotation.z += dt * (0.25 + motion * 0.65);
+        bloom.aura.material.opacity = 0.25 + 0.25 * Math.sin(t * 1.6 + bloom.swaySeed) * 0.5 + 0.25;
+      }
+
+      for (let i = twinkles.length - 1; i >= 0; i--) {
+        const tw = twinkles[i];
+        tw.life += dt;
+        tw.sprite.position.addScaledVector(tw.velocity, dt);
+        tw.velocity.y -= dt * 0.18;
+        tw.sprite.material.opacity = Math.max(0, 1 - tw.life / tw.max) * 0.72;
+        tw.sprite.scale.setScalar(tw.base * (1 + tw.life * 0.85));
+        if (tw.life >= tw.max) {
+          root.remove(tw.sprite);
+          disposeObject(tw.sprite);
+          twinkles.splice(i, 1);
+        }
+      }
+
+      autoTimer -= dt;
+      if (autoGarden && autoTimer <= 0) {
+        autoTimer = 0.85 + Math.random() * 1.25;
+        autoPlantNearCenter();
+      }
+
+      if (mist > 0 && Math.random() < dt * mist * 2.6 && blooms.length > 0) {
+        const b = blooms[Math.floor(Math.random() * blooms.length)];
+        const p = b.group.position.clone().add(new THREE.Vector3(0, b.variant.height * 0.8, 0));
+        burstTwinkles(p, b.variant.accent, 1);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function autoPlantNearCenter() {
+      const center = getSceneCenter();
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.4 + Math.random() * 2.2;
+      const p = new THREE.Vector3(center.x + Math.cos(a) * r, 0, center.z + Math.sin(a) * r);
+      plantBloom(p, { source: 'auto', quiet: true });
+    }
+
+    function updateLabels() {
+      sizeLabel.textContent = Number(sizeSlider.value).toFixed(2);
+      motionLabel.textContent = Number(motionSlider.value).toFixed(2);
+      hueLabel.textContent = Number(hueSlider.value).toFixed(2);
+      mistLabel.textContent = Number(mistSlider.value).toFixed(2);
+    }
+
+    function updateStats() {
+      countStat.textContent = blooms.length;
+      modeStat.textContent = xrMode;
+    }
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function easeOutBack(x) {
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+    }
+
+    function toastMessage(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => toast.classList.remove('visible'), 2200);
+    }
+
+    function disposeObject(object) {
+      object.traverse?.((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          for (const mat of mats) {
+            for (const key of Object.keys(mat)) {
+              const value = mat[key];
+              if (value && value.isTexture) value.dispose();
+            }
+            mat.dispose?.();
+          }
+        }
+      });
+      if (object.material && !object.traverse) object.material.dispose?.();
+      if (object.geometry && !object.traverse) object.geometry.dispose?.();
+    }
+  </script>
+</body>
+</html>
